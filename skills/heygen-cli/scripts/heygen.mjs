@@ -227,7 +227,7 @@ async function generate(env, a) {
 ${a.ratio} · ${a.res} · voz ${a.locale}
 
 Como foi feito:
-• avatar ${avatar.slice(0, 8)}… (Avatar IV) + voz ${voice.slice(0, 8)}…
+• avatar ${avatar.slice(0, 8)}… (${a.engine}) + voz ${voice.slice(0, 8)}…
 • HeyGen API v3 → render → MP4 ${mb} MB
 • Custo: ${cost} créditos de API (restam ${after?.details?.api})
 
