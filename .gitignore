@@ -1,15 +1,16 @@
-# Segredos e IDs privados NUNCA entram aqui — eles vivem em ~/.config/heygen/looks.json
-# e no .env do openpcbot, fora deste repo de propósito. Estas linhas são só a última
-# barreira caso um arquivo desses seja copiado pra cá por acidente.
+# Segredos e IDs privados NUNCA entram aqui — eles vivem em ~/.config/heygen/, fora
+# deste repo de propósito. Estas linhas são só a última barreira caso um arquivo desses
+# seja copiado pra cá por acidente.
 .env
 .env.*
+!.env.example
 looks.json
 *.key
 
-# A skill dos looks pessoais fica no disco, mas nunca é versionada: ela descreve os
-# personagens/looks do dono da conta (nomes, roupas, cenários) — dado pessoal que não
-# tem por que existir num repo, mesmo privado. Só as skills genéricas são compartilhadas.
-skills/avatar-heygen-nei/
+# Camadas pessoais (skills que descrevem os looks/personagens de alguém) moram em outro
+# repo, privado. Este aqui é só o operacional genérico. A linha abaixo é rede de segurança
+# caso uma skill pessoal seja criada dentro desta árvore por engano.
+skills/avatar-*/
 
 node_modules/
 output/

@@ -1,47 +1,70 @@
 #!/usr/bin/env node
-// heygen-cli v1.00.00 — gera vídeo de avatar falante no HeyGen e entrega no bot do openpcbot.
+// heygen-cli — gera vídeo de avatar falante no HeyGen e (opcionalmente) entrega no Telegram.
 // Zero dependências (Node 18+ / Bun: fetch, FormData, Blob nativos).
 //
 // Geração:  node heygen.mjs --text "fala do avatar" [opções]
 // Listar:   node heygen.mjs voices [--lang pt]
 //           node heygen.mjs avatars
+//           node heygen.mjs looks
 //
-// Credenciais e IDs default vêm do .env do openpcbot.
+// Segredos e IDs vêm de um .env e de um config privado — nunca deste arquivo. Veja README.
 
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const VERSION = "1.02.00";
-const ENV_PATH = process.env.HEYGEN_ENV_PATH || "/home/nmaldaner/projetos/openpcbot/.env";
-// Looks do Nei: PRIVADO, fora de qualquer repo de propósito. Não mover para ~/.claude nem ~/projetos.
-const LOOKS_PATH = process.env.HEYGEN_LOOKS_PATH || path.join(os.homedir(), ".config/heygen/looks.json");
+const VERSION = "1.03.00";
+
+// Config privado: mapa slug->avatar, look default e caminhos locais. Fica fora de qualquer repo
+// de propósito — IDs de avatar/voz são dados da conta, e o histórico do git não esquece.
+const CONFIG_PATH = process.env.HEYGEN_LOOKS_PATH || path.join(os.homedir(), ".config/heygen/looks.json");
+
+function loadConfig() {
+  try { return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")); } catch { return {}; }
+}
+const CFG = loadConfig();
+
+// Nomes das variáveis do .env. São nomes, não valores: um setup existente com outra convenção
+// (ex.: HEYGEN_VOICE_ID_FULANO) mapeia via "env_names" no config em vez de renomear o .env.
+const ENV_NAMES = {
+  api_key: "HEYGEN_API_KEY",
+  avatar: "HEYGEN_AVATAR_ID",
+  voice: "HEYGEN_VOICE_ID",
+  tg_token: "TELEGRAM_BOT_TOKEN",
+  tg_chat: "TELEGRAM_CHAT_ID",
+  ...(CFG.env_names || {}),
+};
+
+const ENV_PATH = process.env.HEYGEN_ENV_PATH || CFG.env_path || path.join(os.homedir(), ".config/heygen/.env");
+const OUT_BASE = process.env.HEYGEN_OUT_DIR || CFG.out_dir || path.join(os.homedir(), "heygen-output");
 const API = "https://api.heygen.com";
 
 const HELP = `heygen-cli v${VERSION}
 
 Gerar vídeo:
-  node heygen.mjs --text "O trem da IA já saiu da estação..." [opções]
+  node heygen.mjs --text "sua fala aqui..." [opções]
   node heygen.mjs --text-file roteiro.txt
 
 Opções (com defaults):
-  --look <slug>     look do Nei por nome (ex.: indio, computador) — veja: looks
-  --avatar <id>     avatar_id cru        (default: HEYGEN_AVATAR_ID_NEI do .env)
-  --voice <id>      voice_id             (default: HEYGEN_VOICE_ID_NEI do .env)
+  --look <slug>     look por nome (ex.: escritorio) — veja: looks
+  --avatar <id>     avatar_id cru        (default: look default, ou ${ENV_NAMES.avatar} do .env)
+  --voice <id>      voice_id             (default: voz do look, ou ${ENV_NAMES.voice} do .env)
   --ratio <r>       aspect_ratio 9:16|16:9|1:1|4:5  (default: 9:16)
   --res <r>         720p|1080p|4k        (default: 720p)
   --locale <l>      idioma da voz        (default: pt-BR  -> força português)
   --engine <e>      avatar_iii|avatar_iv|avatar_v  (default: avatar_iii)
   --slug <nome>     pasta de saída       (default: derivado da fala)
   --title <t>       título no dashboard HeyGen
-  --out-dir <dir>   base de saída        (default: ~/projetos/output/heygen)
-  --no-send         NÃO enviar pro bot do openpcbot (default: envia)
-  --dry-run         valida key/avatar/voz SEM gerar (custo 0)
+  --out-dir <dir>   base de saída        (default: ${OUT_BASE})
+  --no-send         NÃO enviar no Telegram (default: envia, se configurado)
+  --dry-run         valida key/avatar/voz/engine SEM gerar (custo 0)
 
 Subcomandos:
-  looks                lista os looks do Nei (slugs pra usar com --look)
+  looks                lista os looks configurados (slugs pra usar com --look)
   voices [--lang pt]   lista vozes (filtra por idioma)
-  avatars              lista seus avatares (grupos de foto avatar)
+  avatars              lista seus avatares (grupos de avatar)
+
+Config: ${CONFIG_PATH} · .env: ${ENV_PATH}
 `;
 
 function parseEnv(p) {
@@ -54,30 +77,29 @@ function parseEnv(p) {
       if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
       out[m[1]] = v;
     }
-  } catch { /* .env opcional para subcomandos? não: precisamos da key */ }
+  } catch { /* .env ausente: quem precisar da key aborta com mensagem clara */ }
   return out;
 }
 
-function loadLooks() {
-  try { return JSON.parse(fs.readFileSync(LOOKS_PATH, "utf8")); } catch { return null; }
-}
-
-// Resolve --look <slug> para um look. Slug desconhecido aborta com a lista — nunca cai
+// Resolve --look <slug> para o look inteiro. Slug desconhecido aborta com a lista — nunca cai
 // silenciosamente no default, senão o vídeo sai com a cara errada e só se descobre pagando.
-// O look pode fixar sua própria voz: avatar que não é o Nei não pode herdar o clone de voz dele.
+// O look pode fixar sua própria voz: um avatar que não é o seu clone não pode herdar a voz dele.
 function resolveLook(slug) {
-  const cfg = loadLooks();
-  if (!cfg) { console.error("✗ looks.json não encontrado em", LOOKS_PATH); process.exit(1); }
-  const hit = cfg.looks?.[slug];
+  const hit = CFG.looks?.[slug];
   if (!hit) {
-    console.error(`✗ look "${slug}" não existe. Disponíveis: ${Object.keys(cfg.looks || {}).join(", ")}`);
+    const avail = Object.keys(CFG.looks || {}).join(", ") || "(nenhum look configurado)";
+    console.error(`✗ look "${slug}" não existe. Disponíveis: ${avail}`);
     process.exit(1);
   }
   return hit;
 }
 
+function defaultLook() {
+  return CFG.default ? CFG.looks?.[CFG.default] : null;
+}
+
 async function api(env, pathname, opt = {}) {
-  const r = await fetch(API + pathname, { ...opt, headers: { "X-Api-Key": env.HEYGEN_API_KEY, ...(opt.headers || {}) } });
+  const r = await fetch(API + pathname, { ...opt, headers: { "X-Api-Key": env[ENV_NAMES.api_key], ...(opt.headers || {}) } });
   let b = null; try { b = await r.json(); } catch { /* não-json */ }
   return { status: r.status, b };
 }
@@ -119,15 +141,20 @@ function parseArgs(argv) {
 }
 
 function cmdLooks() {
-  const cfg = loadLooks();
-  if (!cfg) { console.error("✗ looks.json não encontrado em", LOOKS_PATH); process.exit(1); }
-  const e = Object.entries(cfg.looks || {});
-  console.log(`${e.length} looks do Nei (default: ${cfg.default}):\n`);
-  for (const [slug, l] of e) {
-    const tag = slug === cfg.default ? " ← default" : "";
-    console.log(`  ${slug.padEnd(18)} ${l.desc.padEnd(28)} [${l.type}, ${l.orient}]${tag}`);
+  const e = Object.entries(CFG.looks || {});
+  if (!e.length) {
+    console.log(`Nenhum look configurado em ${CONFIG_PATH}.`);
+    console.log("Crie o arquivo (permissão 600) com o mapa slug -> avatar. Veja o README.");
+    return;
   }
-  console.log(`\nUso: --look <slug>   ·   IDs ficam em ${LOOKS_PATH} (privado, fora do git)`);
+  console.log(`${e.length} looks (default: ${CFG.default || "—"}):\n`);
+  for (const [slug, l] of e) {
+    const tag = slug === CFG.default ? " ← default" : "";
+    const meta = [l.type, l.orient].filter(Boolean).join(", ");
+    const voz = l.voice ? " ·voz própria" : "";
+    console.log(`  ${slug.padEnd(18)} ${(l.desc || "").padEnd(28)} [${meta}]${voz}${tag}`);
+  }
+  console.log(`\nUso: --look <slug>   ·   IDs ficam em ${CONFIG_PATH} (privado, fora do git)`);
 }
 
 async function cmdVoices(env, argv) {
@@ -152,9 +179,13 @@ async function cmdAvatars(env) {
 }
 
 async function generate(env, a) {
-  const avatar = a.avatar || env.HEYGEN_AVATAR_ID_NEI;
-  const voice = a.voice || a.lookVoice || env.HEYGEN_VOICE_ID_NEI;
-  if (!avatar || !voice) { console.error("✗ avatar/voice não definidos (passe --avatar/--voice ou configure no .env)"); process.exit(1); }
+  const dflt = defaultLook();
+  const avatar = a.avatar || env[ENV_NAMES.avatar] || dflt?.id;
+  const voice = a.voice || a.lookVoice || (a.avatar ? null : dflt?.voice) || env[ENV_NAMES.voice];
+  if (!avatar || !voice) {
+    console.error(`✗ avatar/voz não definidos. Passe --look/--avatar e --voice, ou configure ${ENV_NAMES.avatar}/${ENV_NAMES.voice} em ${ENV_PATH}`);
+    process.exit(1);
+  }
   if (!a.text && !a.dryRun) { console.error("✗ faltou --text (a fala do avatar)"); process.exit(1); }
 
   const q0 = await api(env, "/v2/user/remaining_quota");
@@ -181,7 +212,7 @@ async function generate(env, a) {
   }
 
   const slug = a.slug || slugify(a.text);
-  const outDir = path.join(a.outDir || path.join(os.homedir(), "projetos/output/heygen"), slug);
+  const outDir = path.join(a.outDir || OUT_BASE, slug);
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "roteiro.txt"), a.text);
 
@@ -190,7 +221,7 @@ async function generate(env, a) {
     aspect_ratio: a.ratio, resolution: a.res,
     voice_settings: { locale: a.locale },
     engine: { type: a.engine },
-    title: a.title || `INEMA ${slug}`,
+    title: a.title || slug,
   };
   const cr = await api(env, "/v3/videos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const vid = cr.b?.data?.video_id;
@@ -221,7 +252,8 @@ async function generate(env, a) {
   console.log("✓ custo:", cost, "créditos de API · restam", after?.details?.api);
 
   let tgMsg = "(envio desativado)";
-  if (a.send && env.TELEGRAM_BOT_TOKEN && env.ALLOWED_CHAT_ID) {
+  const tgToken = env[ENV_NAMES.tg_token], tgChat = env[ENV_NAMES.tg_chat];
+  if (a.send && tgToken && tgChat) {
     const caption =
 `🎬 ${a.title || slug} — avatar HeyGen
 ${a.ratio} · ${a.res} · voz ${a.locale}
@@ -233,18 +265,20 @@ Como foi feito:
 
 Fala: "${a.text.slice(0, 380)}"`;
     const fd = new FormData();
-    fd.append("chat_id", env.ALLOWED_CHAT_ID);
-    fd.append("caption", caption);
+    fd.append("chat_id", tgChat);
+    fd.append("caption", caption.slice(0, 1024));
     fd.append("supports_streaming", "true");
     fd.append("video", new Blob([buf], { type: "video/mp4" }), `${slug}.mp4`);
-    const tr = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendVideo`, { method: "POST", body: fd });
+    const tr = await fetch(`https://api.telegram.org/bot${tgToken}/sendVideo`, { method: "POST", body: fd });
     const tb = await tr.json();
-    tgMsg = tb.ok ? `enviado ao bot (msg ${tb.result?.message_id})` : `falhou: ${JSON.stringify(tb).slice(0, 200)}`;
+    tgMsg = tb.ok ? `enviado (msg ${tb.result?.message_id})` : `falhou: ${JSON.stringify(tb).slice(0, 200)}`;
+  } else if (a.send) {
+    tgMsg = `pulado (${ENV_NAMES.tg_token}/${ENV_NAMES.tg_chat} não configurados)`;
   }
   console.log("✓ telegram:", tgMsg);
 
   fs.writeFileSync(path.join(outDir, "resultado.json"), JSON.stringify(
-    { video_id: vid, file: outFile, sizeMB: mb, cost_api_credits: cost, quota_after: after?.details?.api, ratio: a.ratio, res: a.res, locale: a.locale }, null, 2));
+    { video_id: vid, file: outFile, sizeMB: mb, cost_api_credits: cost, quota_after: after?.details?.api, ratio: a.ratio, res: a.res, locale: a.locale, engine: a.engine }, null, 2));
   console.log("\nresumo:", path.join(outDir, "resultado.json"));
 }
 
@@ -252,11 +286,12 @@ Fala: "${a.text.slice(0, 380)}"`;
   const argv = process.argv;
   const sub = argv[2];
   if (sub === "--help" || sub === "-h" || !sub) { console.log(HELP); return; }
+  if (sub === "looks") return cmdLooks();
+
   const env = parseEnv(ENV_PATH);
-  if (!env.HEYGEN_API_KEY) { console.error("✗ HEYGEN_API_KEY não encontrada em", ENV_PATH); process.exit(1); }
+  if (!env[ENV_NAMES.api_key]) { console.error(`✗ ${ENV_NAMES.api_key} não encontrada em ${ENV_PATH}`); process.exit(1); }
 
   if (sub === "voices") return cmdVoices(env, argv);
   if (sub === "avatars") return cmdAvatars(env);
-  if (sub === "looks") return cmdLooks();
   return generate(env, parseArgs(argv));
 })().catch((e) => { console.error("ERR", e?.message || e); process.exit(1); });

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// heygen-mcp/deliver.mjs v1.00.00 — entrega um vídeo (já gerado via MCP do HeyGen) no bot do openpcbot.
-// Baixa de uma URL (ou usa arquivo local), salva em ~/projetos/output/heygen/<slug>/ e manda no Telegram.
+// heygen-mcp/deliver.mjs — entrega no Telegram um vídeo já gerado via MCP do HeyGen.
+// Baixa de uma URL (ou usa arquivo local), salva em <out_dir>/<slug>/ e manda no bot.
 // Zero dependências (Node 18+ / Bun).
 //
 //   node deliver.mjs --url "<mp4 url>" --slug nome --caption "texto"
@@ -10,7 +10,14 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const ENV_PATH = process.env.HEYGEN_ENV_PATH || "/home/nmaldaner/projetos/openpcbot/.env";
+// Mesmo config privado do heygen-cli: caminhos e nomes de env var, nunca segredos.
+const CONFIG_PATH = process.env.HEYGEN_LOOKS_PATH || path.join(os.homedir(), ".config/heygen/looks.json");
+let CFG = {};
+try { CFG = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")); } catch { /* config opcional aqui */ }
+
+const ENV_NAMES = { tg_token: "TELEGRAM_BOT_TOKEN", tg_chat: "TELEGRAM_CHAT_ID", ...(CFG.env_names || {}) };
+const ENV_PATH = process.env.HEYGEN_ENV_PATH || CFG.env_path || path.join(os.homedir(), ".config/heygen/.env");
+const OUT_BASE = process.env.HEYGEN_OUT_DIR || CFG.out_dir || path.join(os.homedir(), "heygen-output");
 
 function parseEnv(p) {
   const out = {};
@@ -41,11 +48,11 @@ function slugify(s) {
   const url = arg("--url");
   const file = arg("--file");
   const slug = slugify(arg("--slug") || "mcp-video");
-  const caption = (arg("--caption") || `🎬 vídeo HeyGen (via assinatura)`).replace(/\\n/g, "\n");
+  const caption = (arg("--caption") || "🎬 vídeo HeyGen (via assinatura)").replace(/\\n/g, "\n");
   const send = !has("--no-send");
   if (!url && !file) { console.error("✗ passe --url <mp4> ou --file <caminho>"); process.exit(1); }
 
-  const outDir = path.join(os.homedir(), "projetos/output/heygen", slug);
+  const outDir = path.join(process.env.HEYGEN_OUT_DIR || OUT_BASE, slug);
   fs.mkdirSync(outDir, { recursive: true });
   const outFile = path.join(outDir, `${slug}.mp4`);
 
@@ -65,13 +72,17 @@ function slugify(s) {
   if (!send) { console.log("✓ envio desativado (--no-send)"); return; }
 
   const env = parseEnv(ENV_PATH);
-  if (!env.TELEGRAM_BOT_TOKEN || !env.ALLOWED_CHAT_ID) { console.error("✗ TELEGRAM_BOT_TOKEN/ALLOWED_CHAT_ID ausentes em", ENV_PATH); process.exit(1); }
+  const tgToken = env[ENV_NAMES.tg_token], tgChat = env[ENV_NAMES.tg_chat];
+  if (!tgToken || !tgChat) {
+    console.error(`✗ ${ENV_NAMES.tg_token}/${ENV_NAMES.tg_chat} ausentes em ${ENV_PATH} — vídeo salvo local, envio pulado`);
+    process.exit(1);
+  }
   const fd = new FormData();
-  fd.append("chat_id", env.ALLOWED_CHAT_ID);
+  fd.append("chat_id", tgChat);
   fd.append("caption", caption.slice(0, 1024));
   fd.append("supports_streaming", "true");
   fd.append("video", new Blob([buf], { type: "video/mp4" }), `${slug}.mp4`);
-  const tr = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendVideo`, { method: "POST", body: fd });
+  const tr = await fetch(`https://api.telegram.org/bot${tgToken}/sendVideo`, { method: "POST", body: fd });
   const tb = await tr.json();
-  console.log("✓ telegram:", tb.ok ? `enviado ao bot (msg ${tb.result?.message_id})` : `falhou: ${JSON.stringify(tb).slice(0, 200)}`);
+  console.log("✓ telegram:", tb.ok ? `enviado (msg ${tb.result?.message_id})` : `falhou: ${JSON.stringify(tb).slice(0, 200)}`);
 })().catch((e) => { console.error("ERR", e?.message || e); process.exit(1); });

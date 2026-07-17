@@ -1,6 +1,6 @@
 # heygenmcp
 
-Skills de **vídeo de avatar falante no HeyGen** para o Claude Code. Roteiro de texto → MP4, entregue no bot do openpcbot (Telegram). Um comando, sem dependências (Node 18+ nativo).
+Skills de **vídeo de avatar falante no HeyGen** para o Claude Code. Roteiro de texto → MP4, entregue no Telegram. Um comando, sem dependências (Node 18+ nativo).
 
 Duas skills geram o vídeo — a diferença entre elas é **qual cofre paga**:
 
@@ -11,7 +11,7 @@ Duas skills geram o vídeo — a diferença entre elas é **qual cofre paga**:
 
 O HeyGen tem dois cofres separados que não se cruzam: gastar API não consome a assinatura, e vice-versa. Escolha a skill pelo cofre que você quer queimar.
 
-Uma terceira skill, que escolhe **qual look fala**, é pessoal e **não é versionada** (veja [Configuração](#configuração--fora-deste-repo-de-propósito)). As duas acima funcionam sem ela.
+Este repo é **só o operacional**: nenhum dado de conta, nenhum ID, nenhum look. A camada pessoal — qual avatar é seu, quais looks existem, qual voz é a sua — mora **fora daqui**, em config local e, se você quiser, numa skill própria num repo privado seu (veja [Camada pessoal](#camada-pessoal-fica-fora-deste-repo)).
 
 ## Instalar
 
@@ -35,35 +35,57 @@ node skills/heygen-cli/scripts/heygen.mjs --text "teste" --dry-run
 
 ## Configuração — fora deste repo, de propósito
 
-Nada de segredo mora aqui. O código só conhece **slugs** (`indio`, `computador`); os identificadores reais vivem em dois lugares que nenhum repo alcança:
+Nada de segredo mora aqui. O código só conhece **slugs** (`escritorio`, `estudio`); os identificadores reais vivem em dois arquivos locais que nenhum repo alcança:
 
-- **`.env` do openpcbot** — `HEYGEN_API_KEY`, `HEYGEN_AVATAR_ID_NEI`, `HEYGEN_VOICE_ID_NEI`, `TELEGRAM_BOT_TOKEN`, `ALLOWED_CHAT_ID`. Caminho padrão em `ENV_PATH`; mude com `HEYGEN_ENV_PATH=/outro/.env`.
-- **`~/.config/heygen/looks.json`** (permissão `600`) — o mapa `slug → avatar`, o look default e, opcionalmente, a voz de cada look. Mude com `HEYGEN_LOOKS_PATH`.
+**1. `~/.config/heygen/.env`** — copie do [`.env.example`](.env.example) e preencha:
 
-**Por que essa separação é regra dura:** repo privado vira público, e o histórico do git não esquece. Um ID commitado uma vez fica lá para sempre, mesmo apagado no commit seguinte. Por isso: nenhum `avatar_id` ou `voice_id` em SKILL.md, README, guia, commit ou issue — nem aqui, nem em repo privado.
+```bash
+cp .env.example ~/.config/heygen/.env && chmod 600 ~/.config/heygen/.env
+```
 
-Pela mesma lógica, a skill de seleção de look (`skills/avatar-heygen-nei/`) está no `.gitignore`: ela não contém credencial nenhuma, mas descreve os **looks pessoais** do dono da conta — nomes, roupas, cenários. Isso é dado pessoal, não código compartilhável. Ela fica no disco e funciona normalmente; só não é publicada.
+Só `HEYGEN_API_KEY` é obrigatória. `HEYGEN_AVATAR_ID`/`HEYGEN_VOICE_ID` são o default de quem não usa looks; `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` ligam a entrega no bot — sem eles o vídeo só é salvo local.
 
-Estrutura de um look em `looks.json`:
+**2. `~/.config/heygen/looks.json`** (permissão `600`) — opcional, e o coração da parte pessoal: o mapa `slug → avatar`.
 
 ```json
 {
-  "default": "<slug>",
+  "default": "escritorio",
   "looks": {
-    "<slug>": {
+    "escritorio": {
       "id": "<avatar_id>",
       "voice": "<voice_id opcional — fixa a voz deste look>",
-      "desc": "descrição curta",
-      "type": "digital_twin | photo_avatar",
-      "orient": "portrait | landscape"
+      "desc": "de camisa, mesa de escritório",
+      "type": "digital_twin",
+      "orient": "landscape"
     }
-  }
+  },
+  "env_path": "/caminho/opcional/para/outro/.env",
+  "out_dir": "/caminho/opcional/de/saida",
+  "env_names": { "voice": "MEU_NOME_DE_VAR" }
 }
 ```
 
-O campo `voice` é opcional e existe por um motivo concreto: um avatar que **não** é o dono da conta não pode herdar o clone de voz dele. Precedência da voz: **`--voice` explícito > voz do look > default do `.env`**.
+| Chave | Para quê |
+|---|---|
+| `looks` | mapa `slug → { id, voice?, desc?, type?, orient? }` |
+| `default` | slug usado quando você não passa `--look`/`--avatar` |
+| `env_path` | usar um `.env` que já existe em outro lugar, em vez de `~/.config/heygen/.env` |
+| `out_dir` | base de saída (default: `~/heygen-output`) |
+| `env_names` | **nomes** (não valores) das variáveis, se seu `.env` já usa outra convenção |
+
+`env_names` existe para encaixar num setup que já existe sem renomear nada: se seu `.env` chama a voz de `HEYGEN_VOICE_ID_FULANO`, mapeie aqui. As chaves aceitas são `api_key`, `avatar`, `voice`, `tg_token`, `tg_chat`.
+
+O campo `voice` do look existe por um motivo concreto: um avatar que **não** é o seu clone não pode herdar a voz clonada dele. Precedência da voz: **`--voice` explícito > voz do look > `.env`**.
 
 Um slug inexistente **aborta** com a lista de slugs válidos — nunca cai no default calado. Isso é deliberado: um look errado só se descobriria depois de pagar o render.
+
+Todos os caminhos aceitam override por env var: `HEYGEN_LOOKS_PATH`, `HEYGEN_ENV_PATH`, `HEYGEN_OUT_DIR`.
+
+## Camada pessoal: fica fora deste repo
+
+**Por que essa separação é regra dura:** repo privado vira público, e o histórico do git não esquece. Um ID commitado uma vez fica lá para sempre, mesmo apagado no commit seguinte. Por isso, nunca entram aqui: `avatar_id`, `voice_id`, API key, token de bot — nem em SKILL.md, nem em README, guia, commit ou issue.
+
+O mesmo vale para o que **não é credencial mas é seu**: os nomes e descrições dos seus looks, o caminho do seu `.env`, o seu pipeline de entrega. Isso não é código compartilhável — é dado pessoal. O lugar dele é o `looks.json` local e, se você quiser uma skill que escolha o look por nome ("o de camisa branca", "o do estúdio"), um **repo privado seu**, que constrói por cima destas skills. O `.gitignore` daqui recusa `skills/avatar-*/` como rede de segurança.
 
 ## Buscar: vozes, avatares e looks
 
@@ -99,15 +121,15 @@ node skills/heygen-cli/scripts/heygen.mjs \
 |---|---|---|
 | `--text` / `--text-file` | — (obrigatório) | a fala do avatar |
 | `--look <slug>` | — | look por nome; resolve o avatar (e a voz, se o look fixar) |
-| `--avatar <id>` | `HEYGEN_AVATAR_ID_NEI` | avatar cru, sem passar pelo `looks.json` |
-| `--voice <id>` | voz do look, ou `HEYGEN_VOICE_ID_NEI` | trocar a voz |
+| `--avatar <id>` | look default, ou `HEYGEN_AVATAR_ID` | avatar cru, sem passar pelo `looks.json` |
+| `--voice <id>` | voz do look, ou `HEYGEN_VOICE_ID` | trocar a voz |
 | `--ratio` | `9:16` | `9:16` Reels · `16:9` YouTube · `1:1` · `4:5` |
 | `--res` | `720p` | `720p` · `1080p` · `4k` |
 | `--locale` | `pt-BR` | idioma da voz — **mantém português** |
 | `--engine` | `avatar_iii` | `avatar_iii` · `avatar_iv` · `avatar_v` |
 | `--slug` | derivado da fala | nome da pasta de saída |
-| `--title` | `INEMA <slug>` | título no dashboard do HeyGen |
-| `--out-dir` | `~/projetos/output/heygen` | base da saída |
+| `--title` | o `<slug>` | título no dashboard do HeyGen |
+| `--out-dir` | `~/heygen-output` (ou `out_dir` do config) | base da saída |
 | `--no-send` | (envia) | não mandar no bot, só salvar local |
 | `--dry-run` | — | valida key/avatar/voz/engine **sem gerar** (custo 0) |
 
@@ -148,9 +170,9 @@ O `--ratio` acompanha o destino: `9:16` para Reels/Shorts (default), `16:9` para
 
 Atenção ao enquadramento: um avatar **landscape** funciona em `9:16`, mas foi pensado para `16:9` — o corte em Reels pode ficar ruim. O subcomando `looks` mostra a orientação de cada um; se o corte não fechar, gere em `16:9`.
 
-Terminado o render, o CLI baixa o MP4 e envia ao bot do openpcbot (`sendVideo`) com uma legenda que declara **como foi feito e quanto custou**: ratio, resolução, locale, engine, tamanho do arquivo e o custo medido. Suprima com `--no-send`.
+Terminado o render, o CLI baixa o MP4 e — se o Telegram estiver configurado — envia ao bot (`sendVideo`) com uma legenda que declara **como foi feito e quanto custou**: ratio, resolução, locale, engine, tamanho do arquivo e o custo medido. Suprima com `--no-send`.
 
-Cada render deixa uma pasta em `~/projetos/output/heygen/<slug>/`:
+Cada render deixa uma pasta em `<out_dir>/<slug>/`:
 
 | Arquivo | Conteúdo |
 |---|---|
@@ -158,11 +180,11 @@ Cada render deixa uma pasta em `~/projetos/output/heygen/<slug>/`:
 | `roteiro.txt` | a fala exata usada |
 | `resultado.json` | `video_id`, caminho, tamanho, **custo medido**, quota restante, ratio, res, locale |
 
-O envio só acontece se `TELEGRAM_BOT_TOKEN` e `ALLOWED_CHAT_ID` existirem no `.env`; sem eles, o vídeo fica salvo local e o CLI diz que o envio foi pulado.
+O envio só acontece se `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` existirem no `.env`; sem eles, o vídeo fica salvo local e o CLI diz que o envio foi pulado.
 
 ## Português é o ponto de risco
 
-O clone de voz está cadastrado como *English* na conta. Por isso o CLI força `voice_settings.locale = pt-BR` — **sem isso a pronúncia sai em inglês**. Confira o primeiro render de ouvido; se a pronúncia PT não convencer, liste vozes PT (`voices --lang pt`) e passe `--voice <id>` de uma voz PT-BR nativa.
+Clones de voz costumam ficar cadastrados como *English* na conta, mesmo quando a pessoa fala português. Por isso o CLI força `voice_settings.locale = pt-BR` — **sem isso a pronúncia sai em inglês**. Confira o primeiro render de ouvido; se a pronúncia PT não convencer, liste vozes PT (`voices --lang pt`) e passe `--voice <id>` de uma voz PT-BR nativa.
 
 ## Notas de operação
 
