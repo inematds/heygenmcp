@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>heygenmcp — Vídeo de avatar falante no HeyGen, num comando</title>
+<meta name="description" content="Duas skills de Claude Code que transformam um roteiro de texto em vídeo de avatar falante no HeyGen: uma gasta o pool de API, a outra os créditos da assinatura. Mede o custo real de cada render e entrega o MP4 no Telegram.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0c10; --bg2:#14141b; --card:#16161e; --line:#272730;
+    --txt:#e9e9ee; --mut:#9a9aa6; --amb:#E2A23B; --amb2:#f0c070; --sky:#38bdf8; --pro:#cbd5e1;
+    color-scheme:dark;
+  }
+  body.light{
+    --bg:#f6f7f9; --bg2:#eceef2; --card:#ffffff; --line:#e1e3ea;
+    --txt:#1a1a22; --mut:#5b5b68; --amb:#b9791d; --amb2:#a16207; --sky:#0369a1; --pro:#b45309;
+    color-scheme:light;
+  }
+  body.light .hero .glow{opacity:.5}
+  body.light pre{background:#0e0e14;color:#d6d6e0}
+  body.light pre .c{color:#8a8a98}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.65 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:Sora,sans-serif;line-height:1.15;margin:0}
+  a{color:var(--amb);text-decoration:none}
+  code,pre{font-family:"JetBrains Mono",monospace}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 22px}
+  .mut{color:var(--mut)} .amb{color:var(--amb)}
+  .chip{display:inline-block;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--amb);font-weight:600;font-family:Sora}
+  nav{position:sticky;top:0;z-index:30;backdrop-filter:blur(12px);background:rgba(12,12,16,.78);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;gap:22px;height:60px}
+  nav .brand{display:flex;align-items:center;gap:8px;font-family:Sora;font-weight:800;letter-spacing:-.02em;color:var(--amb)}
+  nav .brand .emoji{font-size:1.25rem}
+  nav .sep{color:var(--mut);opacity:.45}
+  nav .inema{color:var(--sky);font-weight:600;font-size:.88rem;font-family:Sora}
+  nav .inema:hover{filter:brightness(1.15)}
+  nav .pro{color:var(--pro);font-weight:600;font-size:.88rem;font-family:Sora}
+  nav .pro:hover{filter:brightness(1.15)}
+  nav .clubpro{display:inline-flex;align-items:center;gap:6px}
+  nav .links{margin-left:auto;display:flex;align-items:center;gap:20px;font-size:.92rem}
+  nav .links a.sec{color:var(--mut)} nav .links a.sec:hover{color:var(--txt)}
+  .tgl{background:var(--bg2);border:1px solid var(--line);color:var(--txt);width:38px;height:38px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem}
+  .tgl:hover{border-color:var(--amb)}
+  .btn{display:inline-block;background:var(--amb);color:#1a1206;font-weight:600;padding:.6em 1.05em;border-radius:10px;font-family:Sora}
+  .btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+  @media(max-width:760px){nav .links a.sec{display:none}}
+  .hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+  .hero .glow{position:absolute;inset:-40% -20% auto auto;width:70%;height:600px;background:radial-gradient(closest-side,rgba(226,162,59,.22),transparent 70%);pointer-events:none}
+  .hero .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;padding:74px 22px}
+  .hero h1{font-size:clamp(2.2rem,5vw,3.5rem);font-weight:800;letter-spacing:-.025em}
+  .hero p.lead{font-size:1.18rem;color:var(--mut);margin:1.1em 0 1.6em;max-width:34ch}
+  .hero .cta{display:flex;gap:12px;flex-wrap:wrap}
+  .hero figure{margin:0;border-radius:16px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 80px -30px #000}
+  .hero figure img{width:100%;display:block}
+  @media(max-width:780px){.hero .wrap{grid-template-columns:1fr;padding:48px 22px}}
+  section{padding:62px 0;border-bottom:1px solid var(--line)}
+  section h2{font-size:clamp(1.5rem,3.4vw,2.1rem);font-weight:800;letter-spacing:-.02em}
+  section .sub{color:var(--mut);margin:.6em 0 2em;max-width:62ch}
+  .grid{display:grid;gap:16px}
+  .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)} .g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:820px){.g3,.g4{grid-template-columns:1fr 1fr}}
+  @media(max-width:540px){.g2,.g3,.g4{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .card h3{font-size:1.05rem;margin-bottom:.4em}
+  .card p{color:var(--mut);font-size:.92rem;margin:0}
+  .num{display:inline-flex;width:30px;height:30px;align-items:center;justify-content:center;border-radius:8px;background:rgba(226,162,59,.14);color:var(--amb);font-family:Sora;font-weight:800;font-size:.9rem;margin-bottom:.7em}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .flow span{background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:.45em .9em;font-size:.85rem;font-family:Sora;font-weight:600}
+  .flow .arr{color:var(--amb);border:none;background:none;padding:0 .1em}
+  pre{background:#0a0a0e;border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow:auto;font-size:.86rem;line-height:1.6;color:#d6d6e0}
+  pre .c{color:#6f6f7c} pre .k{color:var(--amb2)} pre .s{color:#9ece6a}
+  .step{display:grid;grid-template-columns:46px 1fr;gap:16px;margin-bottom:26px}
+  .step .b{width:46px;height:46px;border-radius:12px;background:var(--amb);color:#1a1206;font-family:Sora;font-weight:800;font-size:1.25rem;display:flex;align-items:center;justify-content:center}
+  .step h3{font-size:1.12rem;margin-bottom:.3em}
+  .step p{color:var(--mut);margin:.2em 0 .7em}
+  .ex{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:680px){.ex{grid-template-columns:1fr}}
+  .ex figure{margin:0;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+  .ex figure img{width:100%;display:block}
+  .ex figcaption{padding:12px 14px;font-size:.88rem;color:var(--mut);background:var(--card)}
+  .phase{display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--line)}
+  .phase:last-child{border:none}
+  .phase .tag{flex:0 0 92px;font-family:Sora;font-weight:800;color:var(--amb)}
+  .phase .d strong{display:block;margin-bottom:.2em}
+  .phase .d span{color:var(--mut);font-size:.92rem}
+  footer{padding:46px 0;text-align:center;color:var(--mut);font-size:.9rem}
+  .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:.3em .8em;font-size:.78rem;color:var(--mut);margin:0 4px}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand" href="#top"><span class="emoji">🗣️</span> heygenmcp</a>
+  <span class="sep">|</span>
+  <span class="clubpro">
+    <a class="inema" href="https://inema.club" target="_blank" rel="noopener">INEMA.CLUB</a>
+    <span class="sep">-</span>
+    <a class="pro" href="https://inema.pro" target="_blank" rel="noopener">PRO</a>
+  </span>
+  <div class="links">
+    <a class="sec" href="#oque">O que é</a>
+    <a class="sec" href="#fluxo">Como funciona</a>
+    <a class="sec" href="#pre">Pré-requisitos</a>
+    <a class="sec" href="#guia">Guia de uso</a>
+    <a class="sec" href="#exemplos">Exemplos</a>
+    <a class="sec" href="#roadmap">Roadmap</a>
+    <button class="tgl" id="themeToggle" aria-label="Alternar tema" title="Alternar tema">🌙</button>
+    <a class="btn" href="https://github.com/inematds/heygenmcp" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div></nav>
+
+<header class="hero" id="top">
+  <div class="glow"></div>
+  <div class="wrap">
+    <div>
+      <span class="chip">Skills de Claude Code · HeyGen</span>
+      <h1>Um roteiro entra. Um <span class="amb">avatar falando</span> sai.</h1>
+      <p class="lead">Duas skills que viram texto em vídeo de avatar no HeyGen — sem abrir o navegador, medindo o custo real de cada render.</p>
+      <div class="cta">
+        <a class="btn" href="#guia">Começar o guia</a>
+        <a class="btn ghost" href="https://github.com/inematds/heygenmcp" target="_blank" rel="noopener">Ver no GitHub</a>
+      </div>
+    </div>
+    <figure><img src="assets/hero.png" alt="heygenmcp — skills de vídeo de avatar falante no HeyGen"></figure>
+  </div>
+</header>
+
+<section id="oque"><div class="wrap">
+  <span class="chip">O que é</span>
+  <h2>Duas skills, um motor, dois cofres</h2>
+  <p class="sub">O HeyGen cobra de dois lugares que não se cruzam: o pool de <strong>API</strong> (Pay-As-You-Go) e os créditos da <strong>assinatura</strong>. As duas skills fazem a mesma coisa — a diferença é qual cofre esvazia. Você escolhe pelo nome.</p>
+  <div class="grid g3">
+    <div class="card"><h3>⚡ heygen-cli</h3><p>O motor. Roteiro → MP4 pela API v3, lista vozes e avatares, mede o custo e entrega no Telegram. Gasta o pool de API.</p></div>
+    <div class="card"><h3>🔌 heygen-mcp</h3><p>Mesma geração, via MCP remoto com OAuth. Gasta os créditos da assinatura — os que você já pagou.</p></div>
+    <div class="card"><h3>🔒 Zero segredo no repo</h3><p>O código só conhece slugs. Chaves e IDs de avatar/voz moram em <code>~/.config/heygen/</code>, fora de qualquer repositório.</p></div>
+  </div>
+</div></section>
+
+<section id="fluxo"><div class="wrap">
+  <span class="chip">Como funciona</span>
+  <h2>Do texto ao MP4, sem etapa manual</h2>
+  <p class="sub">Um comando cobre o caminho inteiro. O <code>--dry-run</code> percorre as três primeiras etapas sem gerar nada — é onde você descobre erro de chave, avatar, voz ou engine sem pagar por isso.</p>
+  <div class="flow">
+    <span>roteiro</span><span class="arr">→</span>
+    <span>valida chave + avatar + voz</span><span class="arr">→</span>
+    <span>engine explícita</span><span class="arr">→</span>
+    <span>render (API v3)</span><span class="arr">→</span>
+    <span>baixa MP4</span><span class="arr">→</span>
+    <span>mede custo real</span><span class="arr">→</span>
+    <span>Telegram</span>
+  </div>
+  <div class="grid g3" style="margin-top:26px">
+    <div class="card"><h3>💸 Mede, não estima</h3><p>Lê a quota antes e depois do render. O delta é o custo real — impresso no terminal, na legenda e salvo no <code>resultado.json</code>.</p></div>
+    <div class="card"><h3>🎛️ Engine explícita</h3><p>Omitir a engine é escolher: o HeyGen assume <code>avatar_iv</code>. O CLI manda <code>avatar_iii</code> e valida se o avatar aceita, antes de gerar.</p></div>
+    <div class="card"><h3>🇧🇷 Português forçado</h3><p>Clone de voz costuma ficar como <em>English</em> na conta. O <code>locale = pt-BR</code> vai sempre no request — sem ele, a pronúncia sai em inglês.</p></div>
+  </div>
+</div></section>
+
+<section id="pre"><div class="wrap">
+  <span class="chip">Pré-requisitos</span>
+  <h2>O que precisa existir antes</h2>
+  <p class="sub">Node 18+ e uma chave. Nada de <code>npm install</code>: os scripts usam só o runtime nativo (fetch, FormData, Blob).</p>
+  <div class="grid g3">
+    <div class="card"><h3>Node 18+</h3><p>Único requisito de máquina. Bun também roda.</p><pre><span class="c"># confira a versão</span>
+<span class="k">node</span> --version</pre></div>
+    <div class="card"><h3>Instalar as skills</h3><p>Clone e aponte para <code>~/.claude/skills/</code> por symlink — editar no repo vale na hora.</p><pre><span class="k">git</span> clone <span class="s">git@github.com:inematds/heygenmcp.git</span> ~/projetos/heygenmcp
+<span class="k">cd</span> ~/projetos/heygenmcp
+<span class="k">for</span> s <span class="k">in</span> heygen-cli heygen-mcp; <span class="k">do</span>
+  <span class="k">ln</span> -s <span class="s">"$PWD/skills/$s"</span> ~/.claude/skills/$s
+<span class="k">done</span></pre></div>
+    <div class="card"><h3>A chave da API</h3><p>HeyGen → Settings → API. Copie o modelo e preencha — o arquivo fica fora do repo.</p><pre><span class="k">cp</span> .env.example ~/.config/heygen/.env
+<span class="k">chmod</span> 600 ~/.config/heygen/.env</pre></div>
+  </div>
+</div></section>
+
+<section id="guia"><div class="wrap">
+  <span class="chip">Guia de uso · passo a passo</span>
+  <h2>Do zero ao primeiro vídeo</h2>
+  <p class="sub">Os quatro primeiros passos não gastam crédito nenhum. Só o passo 5 cobra.</p>
+
+  <div class="step"><div class="b">1</div><div>
+    <h3>Descubra as vozes da conta</h3>
+    <p>O filtro de idioma aceita atalho: o HeyGen filtra pelo nome por extenso (<em>Portuguese</em>), e o CLI traduz o <code>pt</code> para você.</p>
+<pre><span class="k">node</span> skills/heygen-cli/scripts/heygen.mjs voices --lang pt  <span class="c"># voice_id · nome · [idioma/gênero]</span></pre>
+  </div></div>
+
+  <div class="step"><div class="b">2</div><div>
+    <h3>Descubra os avatares</h3>
+    <p>Lista os grupos de avatar da conta, com id, nome e tipo.</p>
+<pre><span class="k">node</span> skills/heygen-cli/scripts/heygen.mjs avatars</pre>
+  </div></div>
+
+  <div class="step"><div class="b">3</div><div>
+    <h3>Dê nome aos seus avatares (opcional)</h3>
+    <p>Em vez de decorar hash, crie <code>~/.config/heygen/looks.json</code> (permissão <code>600</code>) com o mapa <code>slug → avatar</code>. O <code>voice</code> é opcional e fixa a voz daquele look — necessário quando o avatar não é o dono do clone de voz. Slug que não existe aborta com a lista dos válidos, em vez de gerar com a cara errada.</p>
+<pre><span class="c">// ~/.config/heygen/looks.json</span>
+{
+  <span class="s">"default"</span>: <span class="s">"escritorio"</span>,
+  <span class="s">"looks"</span>: {
+    <span class="s">"escritorio"</span>: {
+      <span class="s">"id"</span>: <span class="s">"&lt;avatar_id&gt;"</span>,
+      <span class="s">"voice"</span>: <span class="s">"&lt;voice_id opcional&gt;"</span>,
+      <span class="s">"desc"</span>: <span class="s">"de camisa, mesa de escritório"</span>,
+      <span class="s">"type"</span>: <span class="s">"digital_twin"</span>,
+      <span class="s">"orient"</span>: <span class="s">"landscape"</span>
+    }
+  }
+}</pre>
+<pre><span class="k">node</span> skills/heygen-cli/scripts/heygen.mjs looks  <span class="c"># confere os slugs (não chama a API)</span></pre>
+  </div></div>
+
+  <div class="step"><div class="b">4</div><div>
+    <h3>Ensaie sem pagar</h3>
+    <p>O <code>--dry-run</code> valida chave, avatar, voz e engine contra a API de verdade — e custa zero. Rode antes de todo render novo: são os quatro erros que, sem isso, só aparecem depois de cobrados.</p>
+<pre><span class="k">node</span> skills/heygen-cli/scripts/heygen.mjs --dry-run --look escritorio
+
+<span class="c">✓ key OK · créditos de API disponíveis: 13</span>
+<span class="c">DRY-RUN (nada gerado, custo 0):</span>
+<span class="c">  avatar ... -> OK (digital_twin)</span>
+<span class="c">  voice  ... -> OK Nome da Voz [Portuguese/male]</span>
+<span class="c">  engine avatar_iii -> OK (aceita: avatar_v, avatar_iv, avatar_iii)</span></pre>
+  </div></div>
+
+  <div class="step"><div class="b">5</div><div>
+    <h3>Gere o vídeo</h3>
+    <p>A fala é o único campo obrigatório. O resto tem default: 9:16, 720p, pt-BR, engine <code>avatar_iii</code>, e entrega no Telegram se ele estiver configurado.</p>
+<pre><span class="k">node</span> skills/heygen-cli/scripts/heygen.mjs --text <span class="s">"Sua fala aqui."</span>
+
+<span class="c"># roteiro longo em arquivo, 16:9, sem enviar no bot</span>
+<span class="k">node</span> skills/heygen-cli/scripts/heygen.mjs \
+  --text-file roteiro.txt --look escritorio \
+  --ratio 16:9 --slug minha-campanha --no-send</pre>
+  </div></div>
+
+  <div class="step"><div class="b">6</div><div>
+    <h3>Confira o que saiu</h3>
+    <p>Cada render deixa uma pasta com o vídeo, a fala exata usada e o resumo — incluindo o custo medido e a quota restante.</p>
+<pre><span class="c"># &lt;out_dir&gt;/&lt;slug&gt;/</span>
+minha-campanha.mp4     <span class="c"># o vídeo</span>
+roteiro.txt            <span class="c"># a fala exata</span>
+resultado.json         <span class="c"># video_id, custo real, quota, ratio, res, engine</span></pre>
+  </div></div>
+</div></section>
+
+<section id="exemplos"><div class="wrap">
+  <span class="chip">Exemplos</span>
+  <h2>Receitas que você vai repetir</h2>
+  <p class="sub">Todas as flags têm default sensato — na prática você troca duas ou três.</p>
+  <div class="grid g2">
+    <div class="card"><h3>🎬 Reels em 9:16</h3><p>O default já é vertical e barato (720p). Só a fala muda.</p><pre><span class="k">node</span> …/heygen.mjs \
+  --text <span class="s">"O corte que ninguém faz."</span></pre></div>
+    <div class="card"><h3>📺 YouTube em 16:9, 1080p</h3><p>Suba a resolução só quando o destino pedir — ela pesa no custo.</p><pre><span class="k">node</span> …/heygen.mjs --text-file r.txt \
+  --ratio 16:9 --res 1080p</pre></div>
+    <div class="card"><h3>🎚️ Outra engine</h3><p>O CLI recusa antes de gerar se o avatar não aceitar a engine pedida.</p><pre><span class="k">node</span> …/heygen.mjs --text <span class="s">"teste"</span> \
+  --engine avatar_v --dry-run</pre></div>
+    <div class="card"><h3>🔌 Pela assinatura (MCP)</h3><p>Gere pela tool do MCP e entregue o MP4 com o helper — ele baixa, salva e manda no bot.</p><pre><span class="k">node</span> skills/heygen-mcp/scripts/deliver.mjs \
+  --url <span class="s">"&lt;URL_DO_MP4&gt;"</span> --slug campanha</pre></div>
+  </div>
+</div></section>
+
+<section id="roadmap"><div class="wrap">
+  <span class="chip">Roadmap</span>
+  <h2>Onde está e o que falta</h2>
+  <p class="sub">O que está escrito aqui existe hoje no repo. O resto é declarado como limitação, não como promessa.</p>
+  <div class="phase"><div class="tag">Hoje</div><div class="d"><strong>Geração completa pelos dois cofres</strong><span>Roteiro → MP4 pela API (<code>heygen-cli</code>) ou pela assinatura (<code>heygen-mcp</code>), com voz por look, custo real medido, entrega no Telegram e <code>--dry-run</code> de custo zero.</span></div></div>
+  <div class="phase"><div class="tag">Limitação</div><div class="d"><strong>Engine no caminho MCP</strong><span>Se a tool do MCP não expuser o parâmetro de engine, o vídeo sai em <code>avatar_iv</code> — e não há como forçar <code>avatar_iii</code> por ali. Quando a engine importa, use o <code>heygen-cli</code>, que tem <code>--engine</code>.</span></div></div>
+  <div class="phase"><div class="tag">Cuidado</div><div class="d"><strong>Português é o ponto de risco</strong><span>O <code>locale=pt-BR</code> é forçado, mas clone de voz cadastrado como <em>English</em> ainda pode escapar. Confira o primeiro render de ouvido; se não convencer, troque por uma voz PT nativa com <code>--voice</code>.</span></div></div>
+  <div class="phase"><div class="tag">Próximo</div><div class="d"><strong>Timeout longo de render</strong><span>O polling desiste em ~10 min e imprime o <code>video_id</code>; o vídeo pode ficar pronto depois e ainda estar no dashboard do HeyGen. Falta um subcomando para buscar um render antigo pelo id.</span></div></div>
+</div></section>
+
+<footer>
+  <div class="wrap">
+    <div class="pill">Node 18+</div><div class="pill">Zero dependências</div><div class="pill">HeyGen API v3</div><div class="pill">MCP</div><div class="pill">Claude Code</div>
+    <p style="margin-top:18px">heygenmcp · segredos e IDs vivem fora do repo, em <code>~/.config/heygen/</code> ·
+      <a href="https://github.com/inematds/heygenmcp">inematds/heygenmcp</a> ·
+      <a href="https://inema.club">INEMA.CLUB</a></p>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    var KEY='heygenmcp-theme';
+    var b=document.body, t=document.getElementById('themeToggle');
+    if(localStorage.getItem(KEY)==='light'){ b.classList.add('light'); t.textContent='☀️'; }
+    t.addEventListener('click',function(){
+      var light=b.classList.toggle('light');
+      t.textContent=light?'☀️':'🌙';
+      localStorage.setItem(KEY, light?'light':'dark');
+    });
+  })();
+</script>
+</body>
+</html>
