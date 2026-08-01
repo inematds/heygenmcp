@@ -182,6 +182,24 @@ Cada render deixa uma pasta em `<out_dir>/<slug>/`:
 
 O envio só acontece se `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` existirem no `.env`; sem eles, o vídeo fica salvo local e o CLI diz que o envio foi pulado.
 
+## Legenda: só existe se você pedir no estúdio
+
+O `video_status.get` devolve três campos de legenda: `video_url` (MP4 **sem**
+legenda queimada), `video_url_caption` (o mesmo vídeo **com** a legenda
+queimada) e `caption_url` (a legenda solta). O CLI baixa **sempre o
+`video_url`**, o limpo.
+
+**Não há o que escolher no download.** É um `GET` numa URL pronta — sem
+`?estilo=`, `?formato=`, `?idioma=`; e os endpoints de legenda da API
+(`v1/video.caption`, `v2/video/caption`, `v1/video.subtitle`, `v1/caption.list`,
+`v2/caption_styles`, `v2/video/<id>`) dão **404**. Estilo, fonte e posição se
+decidem **no estúdio, antes de renderizar** — depois estão nos pixels, e só
+regravando.
+
+Medido em 2026-08-01, nos 25 vídeos completos mais recentes da conta:
+`video_url_caption` nulo e `caption_url` vazio em todos. **Não testado:** o que
+acontece com a legenda ligada no estúdio.
+
 ## Português é o ponto de risco
 
 Clones de voz costumam ficar cadastrados como *English* na conta, mesmo quando a pessoa fala português. Por isso o CLI força `voice_settings.locale = pt-BR` — **sem isso a pronúncia sai em inglês**. Confira o primeiro render de ouvido; se a pronúncia PT não convencer, liste vozes PT (`voices --lang pt`) e passe `--voice <id>` de uma voz PT-BR nativa.
